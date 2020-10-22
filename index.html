@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8" />
+    <title>◯◯が、カベに当たる!</title>
+    <style> *{padding:20; margin:20;}
+    			canvas{display:block;
+    			margin:0  auto;}
+				</style>
+	</head>
+     <body>
+
+    <script>
+		"use strict";
+		var newBall,		// バウンドするボールを生成する関数
+		newImageBall,	// 中身が画像のバウンドするボールを生成する関数
+		newBalls;		// ボールの配列を生成する関数
+
+	    // バウンドするボールを生成する関数
+	    newBall = function (canvas, bk, x, y, r, dx, dy, color, text, interval) {
+		var that, timerID, prex, prey, slope, SLOPE, dslope, context, move;
+
+		that = { };	// ボールオブジェクト
+		// timerID：アニメーションのタイマー
+		// prex, prey：直前に描いたボールの位置（描画と移動を非同期に行うために必要）＃ 直前の位置ではなく，書いた時の位置
+		slope = 0; // 傾き
+		SLOPE = 10; // 1回の移動での回転角度の絶対値（定数）
+		dslope = SLOPE;  // 1回の移動での回転角度（SLOPEか-SLOPEのどちらかの値をとる）
+
+		context = canvas.getContext("2d");
+
+		// ボールを描画する
+		that.draw = function () {
+			// 座標変換前の状態を保存
+			context.save();
+			// ballの中心で回転するように座標変換（移動）
+			context.translate(x, y);
+			// 傾ける（回転）
+			context.rotate(slope * Math.PI / 180);
+			// 表示
+			that.drawContent();
+			// 座標変換前の状態を復元（回転と移動を解除）
+			context.restore();
+			// 描画した位置を記憶
+			prex = x;
+			prey = y;
+		};
+
+		// 直前に描いたボールを消す（直前に描いたボールを背景で塗りつぶす）
+		that.hide = function () {
+			context.putImageData(bk, 0, 0, prex - r, prey - r, 2 * r, 2 * r);
+		};
+
+		// ボールを移動する
+		move = function () {
+			if (x < r || x > canvas.width - r) {
+				dx *= -1;
+				if (dx * dy > 0) {
+					dslope = SLOPE;
+				} else {
+					dslope = -SLOPE;
+				}
+			}
+			if (y < r || y > canvas.height - r) {
+				dy *= -1;
+				if (dx * dy < 0) {
+					dslope = SLOPE;
+				} else {
+					dslope = -SLOPE;
+				}
+			}
+			x += dx;
+			y += dy;
+			slope += dslope;
+		};
+
+		// 移動開始
+		that.start = function () {
+			if (timerID !== undefined) {
+				return;
+			}
+			timerID = setInterval(move, interval);
+		};
+
+		// 停止
+		that.stop = function () {
+			if (timerID === undefined) {
+				return;
+			}
+			clearInterval(timerID);
+			timerID = undefined;
+		};
+
+		// 生成したボールオブジェクトを返す．
+		return that;
+	};
+
+	newImageBall = function (canvas, bk, x, y, r, dx, dy, img, interval) {
+		var that, context;
+
+		that = newBall(canvas, bk, x, y, r, dx, dy, undefined, undefined, interval);
+		context = canvas.getContext("2d");
+
+		// ボールを描画する
+		that.drawContent = function () {
+			// クリッピング前の状態を保存
+			context.save();
+			/* 円形のクリッピングパスを生成 */
+			context.beginPath();
+			context.arc(0, 0, r, 0, Math.PI * 2, false);
+			context.clip();
+			/* imageを張る */
+			context.drawImage(img, 0, 0, img.width, img.height, -r, -r, r * 2, r * 2);
+			// クリッピング前の状態を復元（クリッピングを解除）
+			context.restore();
+		};
+
+		return that;
+
+	};
+
+	newBalls = function (interval) {
+		var that, timerID, draw;
+
+		that = [];
+
+		draw = function () {
+			var i;
+			// 直前に書いたボールを全て消す（背景画像で塗りつぶす）
+			for (i = 0; i < that.length; i += 1) {
+				that[i].hide();
+			}
+			// 新しい位置でボールを全て描く
+			for (i = 0; i < that.length; i += 1) {
+				that[i].draw();
+			}
+		};
+
+		// 開始 （ボールを動かす）
+		that.start = function () {
+			var i;
+			for (i = 0; i < that.length; i += 1) {
+				that[i].start();
+			}
+			if (timerID !== undefined) {
+				return;
+			}
+			timerID = setInterval(draw, interval);
+		};
+
+		// 停止 （ボールを止める）
+		that.stop = function () {
+			var i;
+			for (i = 0; i < that.length; i += 1) {
+				that[i].stop();
+			}
+			if (timerID === undefined) {
+				return;
+			}
+			clearInterval(timerID);
+			timerID = undefined;
+		};
+
+		return that;
+	};
+
+
+	// メイン
+	window.onload = function () {
+		var canvas, context, ball1, ball2, balls, bk, grad, img1, img2, loaded;
+
+		// Canvasを取得
+		canvas = document.getElementById("canvasA");
+		// コンテキストを取得
+		context = canvas.getContext("2d");
+
+
+		// 背景を描画  （グラデーション）
+		grad  = context.createLinearGradient(0, 0, 0, 400);
+		// グラデーション終点のオフセットと色をセット
+		grad.addColorStop(0, "#0000CD");
+		grad.addColorStop(0.5, "#FFFFE0");
+		grad.addColorStop(1, "#555555");
+		context.fillStyle = grad;
+		context.fillRect(0, 0, 600, 400);
+
+		// 背景のイメージデータを取得
+		bk = context.getImageData(0, 0, 600, 400);
+
+		// ボールを生成して，ボールの配列に追加
+		balls = newBalls(30);
+
+		img1 = new Image();
+		loaded = false;
+		img1.src = "images/001.jpg";
+		img1.onload = function () {
+			ball1 = newImageBall(canvas, bk, 40, 40, 40, 2, 3, img1, 30);
+			ball1.draw();
+			balls.push(ball1);
+			if (loaded) {
+				// アニメーション
+				balls.start();
+			} else {
+				loaded = true;
+			}
+		};
+		img2 = new Image();
+		img2.src = "images/002.jpg";
+		img2.onload = function () {
+			ball2 = newImageBall(canvas, bk, 200, 100, 35, 5, 3, img2, 50);
+			ball2.draw();
+			balls.push(ball2);
+			if (loaded) {
+				// アニメーション
+				balls.start();
+			} else {
+				loaded = true;
+			}
+		};
+	};
+    </script>
+</head>
+<body>
+    <canvas id="canvasA" width="600" height="400"></canvas>
+</body>
+</html>
